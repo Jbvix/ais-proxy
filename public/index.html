@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIS Viewer (Railway)</title>
+  <style>
+    :root { --bg:#0b0b0e; --panel:#121218; --text:#e8e8f0; --muted:#9aa0a6; --accent:#00d084 }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text) }
+    header { padding:16px 20px; background:#0f0f15; border-bottom:1px solid #1e1e2a; display:flex; justify-content:space-between; align-items:center }
+    h1 { font-size:18px; margin:0 }
+    main { max-width:1100px; margin:20px auto; padding:0 16px }
+    .card { background:var(--panel); border:1px solid #1e1e2a; border-radius:12px; padding:16px }
+    button{ background:var(--accent); color:#05251a; border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:700 }
+    pre { white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow: auto; margin:0 }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AIS Viewer (Railway)</h1>
+    <button id="btn">Conectar</button>
+  </header>
+  <main>
+    <div class="card">
+      <pre id="log">(desconectado)</pre>
+    </div>
+  </main>
+  <script>
+    const logEl = document.getElementById('log');
+    document.getElementById('btn').onclick = () => {
+      const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const url = `${wsProto}://${location.host}/ws`;
+      const ws = new WebSocket(url);
+      logEl.textContent = `Conectando em ${url}...`;
+      ws.onopen = () => logEl.textContent = '✅ Conectado. Aguardando mensagens AIS...';
+      ws.onmessage = (e) => {
+        try {
+          const obj = JSON.parse(e.data);
+          const t = obj?.MessageType || obj?.type;
+          const mmsi = obj?.MetaData?.MMSI;
+          const name = obj?.MetaData?.ShipName;
+          const lat = obj?.MetaData?.Latitude ?? obj?.Message?.PositionReport?.Latitude;
+          const lon = obj?.MetaData?.Longitude ?? obj?.Message?.PositionReport?.Longitude;
+          const sog = obj?.Message?.PositionReport?.Sog;
+          const cog = obj?.Message?.PositionReport?.Cog;
+          const line = `[${t}] ${name || '—'} MMSI:${mmsi || '—'} Lat:${lat?.toFixed?.(5)} Lon:${lon?.toFixed?.(5)} SOG:${sog ?? '—'} COG:${cog ?? '—'}`;
+          logEl.textContent = line + '\n' + logEl.textContent;
+        } catch {
+          logEl.textContent = e.data + '\n' + logEl.textContent;
+        }
+      };
+      ws.onerror = () => logEl.textContent = '❌ Erro de WebSocket';
+      ws.onclose = () => logEl.textContent = '🔌 Desconectado';
+    };
+  </script>
+</body>
+</html>
